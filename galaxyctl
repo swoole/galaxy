@@ -62,7 +62,11 @@ random_base64() {
         openssl rand -base64 "$1" | tr -d '\n'
         return
     fi
-    random_hex "$1"
+    if command -v base64 >/dev/null 2>&1; then
+        dd if=/dev/urandom bs=1 count="$1" 2>/dev/null | base64 | tr -d '\n'
+        return
+    fi
+    fail '生成密钥需要 openssl 或 base64'
 }
 
 initialize_env() {
@@ -83,6 +87,9 @@ initialize_env() {
     esac
     case "$(read_env SSO_JWT_SECRET)" in
         ''|replace-*) set_env SSO_JWT_SECRET "$(random_base64 32)" ;;
+    esac
+    case "$(read_env ENCRYPT_KEY)" in
+        ''|replace-*) set_env ENCRYPT_KEY "$(random_base64 32)" ;;
     esac
     case "$(read_env SWARM_CREDENTIAL_KEY)" in
         ''|replace-*) set_env SWARM_CREDENTIAL_KEY "$(random_base64 32)" ;;

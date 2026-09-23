@@ -13,6 +13,8 @@
 **/.env
 **/dist/
 **/coverage/
+galaxy-api/asserts/
+galaxy-api/storage/keys/
 galaxy-cli/
 docs/
 galaxy-docs/

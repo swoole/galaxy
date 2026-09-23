@@ -82,6 +82,10 @@ RUN apk add --no-cache \
 
 WORKDIR /opt/www
 COPY galaxy-api/ ./
+RUN if [ -d storage/keys ] && find storage/keys -type f ! -name '.gitkeep' -print -quit | grep -q .; then \
+        echo 'Refusing to build: galaxy-api/storage/keys contains secret files' >&2; \
+        exit 1; \
+    fi
 COPY --from=api-vendor /deps/vendor ./vendor
 COPY --from=ssh-relay-builder /out/galaxy-ssh-relay /usr/local/bin/galaxy-ssh-relay
 COPY --from=helm-service-builder /out/galaxy-helm-service /usr/local/bin/galaxy-helm-service

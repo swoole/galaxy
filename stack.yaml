@@ -1,0 +1,95 @@
+services:
+  galaxy:
+    image: ${GALAXY_IMAGE:-registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy}:${GALAXY_VERSION:-latest}
+    environment:
+      APP_NAME: CodeGalaxy
+      APP_ENV: prod
+      DB_HOST: ${DB_HOST:?DB_HOST is required}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_DATABASE: ${DB_DATABASE:-code_galaxy}
+      DB_USERNAME: ${DB_USERNAME:-galaxy}
+      DB_PASSWORD_FILE: /run/secrets/galaxy_db_password
+      DB_CHARSET: utf8mb4
+      DB_COLLATION: utf8mb4_unicode_ci
+      DB_PREFIX: galaxy_
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_AUTH_FILE: /run/secrets/galaxy_redis_password
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_HOST_QUEUE: ${REDIS_HOST:?REDIS_HOST is required}
+      REDIS_PORT_QUEUE: ${REDIS_PORT:-6379}
+      REDIS_AUTH_QUEUE_FILE: /run/secrets/galaxy_redis_password
+      REDIS_DB_QUEUE: ${REDIS_DB_QUEUE:-1}
+      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required}
+      WEBHOOK_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required}
+      AGENT_SERVER_URL: ${AGENT_SERVER_URL:?AGENT_SERVER_URL is required}
+      SIMPLE_JWT_SECRET_FILE: /run/secrets/galaxy_simple_jwt_secret
+      SSO_JWT_SECRET_FILE: /run/secrets/galaxy_sso_jwt_secret
+      ENCRYPT_KEY_FILE: /run/secrets/galaxy_encrypt_key
+      SWARM_CREDENTIAL_KEY_FILE: /run/secrets/galaxy_swarm_credential_key
+      SSH_RELAY_ENABLED: "true"
+      SSH_RELAY_INTERNAL_TOKEN_FILE: /run/secrets/galaxy_ssh_relay_token
+      GALAXY_INSTALL_TOKEN_FILE: /run/secrets/galaxy_install_token
+      GALAXY_ADMIN_EMAIL: ${GALAXY_ADMIN_EMAIL:-admin@example.com}
+      MIDDLEWARE_ENABLE_CORS: "true"
+      PROJECT_MONITOR_ENABLED: "true"
+      HELM_SERVICE_ENABLED: "true"
+      GALAXY_AUTO_INIT: "true"
+      TZ: ${TZ:-Asia/Shanghai}
+    secrets:
+      - galaxy_db_password
+      - galaxy_redis_password
+      - galaxy_simple_jwt_secret
+      - galaxy_sso_jwt_secret
+      - galaxy_encrypt_key
+      - galaxy_swarm_credential_key
+      - galaxy_ssh_relay_token
+      - galaxy_install_token
+    ports:
+      - target: 80
+        published: ${GALAXY_HTTP_PORT:-8080}
+        protocol: tcp
+        mode: ingress
+      - target: 9522
+        published: ${GALAXY_SSH_PORT:-9522}
+        protocol: tcp
+        mode: ingress
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 0
+      update_config:
+        parallelism: 1
+        order: stop-first
+        failure_action: rollback
+        monitor: 60s
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+    networks:
+      - galaxy
+
+networks:
+  galaxy:
+    driver: overlay
+    attachable: true
+
+secrets:
+  galaxy_db_password:
+    external: true
+  galaxy_redis_password:
+    external: true
+  galaxy_simple_jwt_secret:
+    external: true
+  galaxy_sso_jwt_secret:
+    external: true
+  galaxy_encrypt_key:
+    external: true
+  galaxy_swarm_credential_key:
+    external: true
+  galaxy_ssh_relay_token:
+    external: true
+  galaxy_install_token:
+    external: true

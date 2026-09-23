@@ -10,7 +10,7 @@ command -v curl >/dev/null 2>&1 || {
 }
 
 mkdir -p "$INSTALL_DIR"
-for file in compose.yaml .env.example galaxyctl; do
+for file in compose.yaml stack.yaml .env.example galaxyctl; do
     curl -fsSL "$RELEASE_BASE_URL/$file" -o "$INSTALL_DIR/$file"
 done
 chmod 0755 "$INSTALL_DIR/galaxyctl"
