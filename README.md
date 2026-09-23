@@ -9,26 +9,20 @@
 | `registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy:<version>` | 前端、Nginx、API、ssh-relay 和 helm-service |
 | `registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy-agent:<version>` | Docker Swarm 每节点 Agent |
 
-快速体验只需要 Galaxy、MySQL 和 Redis 镜像。接入 Swarm 时再使用 Agent 镜像。上述
-镜像均从 `registry.cn-shanghai.aliyuncs.com/swoole-public` 拉取。
+快速体验只需要 Galaxy、MySQL 和 Redis 镜像。快速安装中的 MySQL、Redis 仅用于单机
+体验；正式环境由用户独立部署和维护。接入 Swarm 时再使用 Agent 镜像。上述镜像均从
+`registry.cn-shanghai.aliyuncs.com/swoole-public` 拉取。
 
 ## 本地构建
 
-从工作区根目录作为 Docker build context：
+使用发布构建脚本：
 
 ```bash
 ./galaxy/build.sh dev
 ```
 
-也可以单独构建一体化镜像：
-
-```bash
-docker build \
-  -f galaxy/Dockerfile \
-  --build-arg VERSION=dev \
-  -t registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy:dev \
-  .
-```
+脚本先生成排除了 `.env`、`storage/keys` 和运行数据的临时上下文，避免本地密钥进入镜像。
+不要绕过脚本直接使用工作区根目录构建公开镜像。
 
 ## 本地安装
 
@@ -59,6 +53,12 @@ cd galaxy
 
 `update` 会先备份数据库并保留本地应用回滚镜像。当前数据库增量迁移链尚未建立，因此正式
 版本只应开放经过升级测试并明确声明兼容的更新路径。
+
+## Docker Swarm
+
+`compose.yaml` 用于单机体验，不能直接交给 `docker stack deploy`。Swarm 使用
+`stack.yaml`，其中只部署无状态 Galaxy 服务，MySQL 和 Redis 地址由用户提供，固定密钥由
+Docker Secret 注入。完整步骤见公开文档中的“部署到 Docker Swarm”。
 
 ## 远程一键安装
 
