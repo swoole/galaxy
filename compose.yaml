@@ -2,7 +2,7 @@ name: galaxy
 
 services:
   mysql:
-    image: mysql:8.0
+    image: registry.cn-shanghai.aliyuncs.com/swoole-public/mysql:8.0
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-code_galaxy}
@@ -25,7 +25,7 @@ services:
       - internal
 
   redis:
-    image: redis:7.4-alpine
+    image: registry.cn-shanghai.aliyuncs.com/swoole-public/redis:7.4-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:

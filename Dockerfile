@@ -1,6 +1,6 @@
-# syntax=docker/dockerfile:1.7
+# syntax=registry.cn-shanghai.aliyuncs.com/swoole-public/dockerfile:1.7
 
-FROM node:22-alpine AS frontend-builder
+FROM registry.cn-shanghai.aliyuncs.com/swoole-public/node:22-alpine AS frontend-builder
 
 WORKDIR /src
 COPY galaxy-fe/package.json galaxy-fe/package-lock.json ./
@@ -16,7 +16,7 @@ ENV VUE_APP_BASE_API=${VUE_APP_BASE_API} \
     VUE_APP_COOKIE_DOMAIN=${VUE_APP_COOKIE_DOMAIN}
 RUN npm run build
 
-FROM golang:1.24-alpine AS ssh-relay-builder
+FROM registry.cn-shanghai.aliyuncs.com/swoole-public/golang:1.24-alpine AS ssh-relay-builder
 
 ARG GOPROXY=https://goproxy.cn,direct
 ENV GOPROXY=${GOPROXY}
@@ -26,7 +26,7 @@ RUN go mod download
 COPY galaxy-api/ssh-relay/ ./
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/galaxy-ssh-relay .
 
-FROM golang:1.24-alpine AS helm-service-builder
+FROM registry.cn-shanghai.aliyuncs.com/swoole-public/golang:1.24-alpine AS helm-service-builder
 
 ARG GOPROXY=https://goproxy.cn,direct
 ENV GOPROXY=${GOPROXY}
@@ -36,7 +36,7 @@ RUN go mod download
 COPY galaxy-api/helm-service/ ./
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/galaxy-helm-service .
 
-FROM hyperf/hyperf:8.4-alpine-v3.21-swoole AS api-vendor
+FROM registry.cn-shanghai.aliyuncs.com/swoole-public/hyperf:8.4-alpine-v3.21-swoole AS api-vendor
 
 WORKDIR /deps
 COPY galaxy-api/composer.json galaxy-api/composer.lock ./
@@ -48,7 +48,7 @@ RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/compos
         --no-scripts \
         --no-autoloader
 
-FROM hyperf/hyperf:8.4-alpine-v3.21-swoole
+FROM registry.cn-shanghai.aliyuncs.com/swoole-public/hyperf:8.4-alpine-v3.21-swoole
 
 ARG VERSION=dev
 ARG VCS_REF=unknown

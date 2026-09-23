@@ -7,10 +7,10 @@
 | 镜像 | 用途 |
 | --- | --- |
 | `registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy:<version>` | 前端、Nginx、API、ssh-relay 和 helm-service |
-| `phpswoole/galaxy-agent:<version>` | Docker Swarm 每节点 Agent |
+| `registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy-agent:<version>` | Docker Swarm 每节点 Agent |
 
-快速体验只需要第一个 Galaxy 镜像以及官方 MySQL、Redis 镜像。接入 Swarm 时再使用 Agent
-镜像。
+快速体验只需要 Galaxy、MySQL 和 Redis 镜像。接入 Swarm 时再使用 Agent 镜像。上述
+镜像均从 `registry.cn-shanghai.aliyuncs.com/swoole-public` 拉取。
 
 ## 本地构建
 
