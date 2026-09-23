@@ -50,18 +50,6 @@ RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/compos
 
 FROM registry.cn-shanghai.aliyuncs.com/swoole-public/hyperf:8.4-alpine-v3.21-swoole
 
-ARG VERSION=dev
-ARG VCS_REF=unknown
-ARG BUILD_DATE=unknown
-
-LABEL org.opencontainers.image.title="CodeGalaxy" \
-      org.opencontainers.image.description="Self-hosted CodeGalaxy control plane" \
-      org.opencontainers.image.source="https://github.com/swoole/galaxy" \
-      org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.revision="${VCS_REF}" \
-      org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.licenses="Apache-2.0"
-
 ENV APP_ENV=prod \
     SCAN_CACHEABLE=true \
     TIMEZONE=Asia/Shanghai \
@@ -81,15 +69,15 @@ RUN apk add --no-cache \
     && printf '%s\n' "swoole.use_shortname = 'Off'" >> /etc/php84/conf.d/50_swoole.ini
 
 WORKDIR /opt/www
+COPY --from=api-vendor /deps/vendor ./vendor
+COPY --from=ssh-relay-builder /out/galaxy-ssh-relay /usr/local/bin/galaxy-ssh-relay
+COPY --from=helm-service-builder /out/galaxy-helm-service /usr/local/bin/galaxy-helm-service
+COPY --from=frontend-builder /src/dist/ /usr/share/nginx/html/
 COPY galaxy-api/ ./
 RUN if [ -d storage/keys ] && find storage/keys -type f ! -name '.gitkeep' -print -quit | grep -q .; then \
         echo 'Refusing to build: galaxy-api/storage/keys contains secret files' >&2; \
         exit 1; \
     fi
-COPY --from=api-vendor /deps/vendor ./vendor
-COPY --from=ssh-relay-builder /out/galaxy-ssh-relay /usr/local/bin/galaxy-ssh-relay
-COPY --from=helm-service-builder /out/galaxy-helm-service /usr/local/bin/galaxy-helm-service
-COPY --from=frontend-builder /src/dist/ /usr/share/nginx/html/
 COPY galaxy/image/nginx.conf /etc/nginx/http.d/default.conf
 COPY galaxy/image/entrypoint.sh /usr/local/bin/galaxy-entrypoint
 COPY galaxy/image/initialize-database.php /usr/local/lib/galaxy/initialize-database.php
@@ -99,6 +87,18 @@ RUN composer dump-autoload --no-dev --optimize \
     && php bin/hyperf.php \
     && chmod 0755 docker/entrypoint-api.sh /usr/local/bin/galaxy-entrypoint \
     && mkdir -p /run/nginx /usr/local/lib/galaxy
+
+ARG VERSION=dev
+ARG VCS_REF=unknown
+ARG BUILD_DATE=unknown
+
+LABEL org.opencontainers.image.title="CodeGalaxy" \
+      org.opencontainers.image.description="Self-hosted CodeGalaxy control plane" \
+      org.opencontainers.image.source="https://github.com/swoole/galaxy" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.licenses="Apache-2.0"
 
 EXPOSE 80 9522
 
