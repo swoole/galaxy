@@ -1,0 +1,250 @@
+#!/bin/sh
+set -eu
+
+ROOT_DIR="${GALAXY_HOME:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
+COMPOSE_FILE="$ROOT_DIR/compose.yaml"
+ENV_FILE="$ROOT_DIR/.env"
+EXAMPLE_ENV_FILE="$ROOT_DIR/.env.example"
+BACKUP_DIR="$ROOT_DIR/backups"
+
+info() {
+    printf '[Galaxy] %s\n' "$*"
+}
+
+fail() {
+    printf '[Galaxy] 错误：%s\n' "$*" >&2
+    exit 1
+}
+
+require_command() {
+    command -v "$1" >/dev/null 2>&1 || fail "缺少命令：$1"
+}
+
+check_docker() {
+    require_command docker
+    docker info >/dev/null 2>&1 || fail 'Docker Engine 不可用，请先启动 Docker'
+    docker compose version >/dev/null 2>&1 || fail '需要 Docker Compose v2'
+}
+
+compose() {
+    docker compose --env-file "$ENV_FILE" --file "$COMPOSE_FILE" "$@"
+}
+
+read_env() {
+    key="$1"
+    awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE"
+}
+
+set_env() {
+    key="$1"
+    value="$2"
+    temporary="$(mktemp "$ROOT_DIR/.env.XXXXXX")"
+    awk -v key="$key" -v value="$value" '
+        BEGIN { found = 0 }
+        index($0, key "=") == 1 { print key "=" value; found = 1; next }
+        { print }
+        END { if (!found) print key "=" value }
+    ' "$ENV_FILE" > "$temporary"
+    chmod 0600 "$temporary"
+    mv "$temporary" "$ENV_FILE"
+}
+
+random_hex() {
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -hex "$1"
+        return
+    fi
+    od -An -N"$1" -tx1 /dev/urandom | tr -d ' \n'
+}
+
+random_base64() {
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -base64 "$1" | tr -d '\n'
+        return
+    fi
+    random_hex "$1"
+}
+
+initialize_env() {
+    [ -f "$EXAMPLE_ENV_FILE" ] || fail "缺少 $EXAMPLE_ENV_FILE"
+    if [ ! -f "$ENV_FILE" ]; then
+        cp "$EXAMPLE_ENV_FILE" "$ENV_FILE"
+        chmod 0600 "$ENV_FILE"
+    fi
+
+    case "$(read_env MYSQL_PASSWORD)" in
+        ''|replace-*) set_env MYSQL_PASSWORD "$(random_hex 16)" ;;
+    esac
+    case "$(read_env MYSQL_ROOT_PASSWORD)" in
+        ''|replace-*) set_env MYSQL_ROOT_PASSWORD "$(random_hex 20)" ;;
+    esac
+    case "$(read_env SIMPLE_JWT_SECRET)" in
+        ''|replace-*) set_env SIMPLE_JWT_SECRET "$(random_base64 32)" ;;
+    esac
+    case "$(read_env SSO_JWT_SECRET)" in
+        ''|replace-*) set_env SSO_JWT_SECRET "$(random_base64 32)" ;;
+    esac
+    case "$(read_env SWARM_CREDENTIAL_KEY)" in
+        ''|replace-*) set_env SWARM_CREDENTIAL_KEY "$(random_base64 32)" ;;
+    esac
+    case "$(read_env SSH_RELAY_INTERNAL_TOKEN)" in
+        ''|replace-*) set_env SSH_RELAY_INTERNAL_TOKEN "$(random_base64 32)" ;;
+    esac
+    case "$(read_env GALAXY_INSTALL_TOKEN)" in
+        ''|replace-*) set_env GALAXY_INSTALL_TOKEN "$(random_hex 32)" ;;
+    esac
+}
+
+wait_for_galaxy() {
+    attempts=0
+    while [ "$attempts" -lt 60 ]; do
+        container_id="$(compose ps -q galaxy 2>/dev/null || true)"
+        if [ -n "$container_id" ]; then
+            health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)"
+            if [ "$health" = healthy ]; then
+                return 0
+            fi
+            if [ "$health" = unhealthy ] || [ "$health" = exited ] || [ "$health" = dead ]; then
+                compose logs --tail=100 galaxy >&2 || true
+                return 1
+            fi
+        fi
+        attempts=$((attempts + 1))
+        sleep 2
+    done
+    compose logs --tail=100 galaxy >&2 || true
+    return 1
+}
+
+install_stack() {
+    public_url=''
+    version=''
+    admin_email=''
+    pull_images=true
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --url) [ "$#" -ge 2 ] || fail '--url 缺少值'; public_url="$2"; shift 2 ;;
+            --version) [ "$#" -ge 2 ] || fail '--version 缺少值'; version="$2"; shift 2 ;;
+            --admin-email) [ "$#" -ge 2 ] || fail '--admin-email 缺少值'; admin_email="$2"; shift 2 ;;
+            --no-pull) pull_images=false; shift ;;
+            *) fail "未知参数：$1" ;;
+        esac
+    done
+
+    check_docker
+    initialize_env
+    [ -z "$public_url" ] || set_env GALAXY_PUBLIC_URL "${public_url%/}"
+    [ -z "$version" ] || set_env GALAXY_VERSION "$version"
+    [ -z "$admin_email" ] || set_env GALAXY_ADMIN_EMAIL "$admin_email"
+
+    compose config --quiet
+    if [ "$pull_images" = true ]; then
+        info "拉取 CodeGalaxy $(read_env GALAXY_VERSION) 及基础镜像"
+        compose pull
+    else
+        info '使用本地镜像，跳过镜像拉取'
+    fi
+    info '启动 MySQL、Redis 和 CodeGalaxy'
+    compose up --detach --remove-orphans
+    info '等待服务健康检查'
+    wait_for_galaxy || fail 'CodeGalaxy 启动失败，请运行 ./galaxyctl logs 查看日志'
+    public_url="$(read_env GALAXY_PUBLIC_URL)"
+    install_token="$(read_env GALAXY_INSTALL_TOKEN)"
+    info '服务启动完成，请打开首次初始化页面：'
+    printf '%s/install#token=%s\n' "${public_url%/}" "$install_token"
+}
+
+backup_database() {
+    check_docker
+    initialize_env
+    mkdir -p "$BACKUP_DIR"
+    backup_file="$BACKUP_DIR/galaxy-$(date '+%Y%m%d-%H%M%S').sql"
+    info "备份数据库到 $backup_file"
+    compose exec -T mysql sh -c \
+        'exec mysqldump --single-transaction --routines --triggers -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' \
+        > "$backup_file"
+    chmod 0600 "$backup_file"
+    info '数据库备份完成'
+}
+
+update_stack() {
+    target_version="${1:-latest}"
+    check_docker
+    initialize_env
+    old_version="$(read_env GALAXY_VERSION)"
+    [ -n "$old_version" ] || old_version=latest
+
+    backup_database
+    if docker image inspect "phpswoole/galaxy:$old_version" >/dev/null 2>&1; then
+        docker tag "phpswoole/galaxy:$old_version" phpswoole/galaxy:galaxyctl-rollback
+    fi
+
+    set_env GALAXY_VERSION "$target_version"
+    info "更新 CodeGalaxy：$old_version -> $target_version"
+    if compose pull galaxy && compose up --detach --no-deps galaxy && wait_for_galaxy; then
+        info "更新完成：$target_version"
+        return 0
+    fi
+
+    info '新版本健康检查失败，正在回滚应用镜像'
+    if docker image inspect phpswoole/galaxy:galaxyctl-rollback >/dev/null 2>&1; then
+        set_env GALAXY_VERSION galaxyctl-rollback
+        compose up --detach --no-deps galaxy
+        wait_for_galaxy || fail '自动回滚失败，请检查日志和数据库备份'
+        info '应用镜像已回滚；数据库备份未自动恢复'
+        return 1
+    fi
+
+    set_env GALAXY_VERSION "$old_version"
+    fail '没有可用的本地回滚镜像，请检查日志和数据库备份'
+}
+
+show_status() {
+    check_docker
+    initialize_env
+    compose ps
+    printf '\n访问地址：%s\n' "$(read_env GALAXY_PUBLIC_URL)"
+}
+
+doctor() {
+    check_docker
+    initialize_env
+    compose config --quiet
+    info 'Docker、Compose 和配置文件检查通过'
+    show_status
+}
+
+usage() {
+    cat <<'EOF'
+用法：./galaxyctl <命令> [参数]
+
+命令：
+  install [--url URL] [--version VERSION] [--admin-email EMAIL] [--no-pull]
+  update [VERSION]
+  backup
+  status
+  doctor
+  logs [SERVICE]
+  stop
+  start
+  down
+EOF
+}
+
+command_name="${1:-}"
+[ -n "$command_name" ] || { usage; exit 0; }
+shift
+
+case "$command_name" in
+    install) install_stack "$@" ;;
+    update|upgrade) update_stack "$@" ;;
+    backup) backup_database ;;
+    status) show_status ;;
+    doctor) doctor ;;
+    logs) check_docker; initialize_env; compose logs --follow --tail=200 "${1:-galaxy}" ;;
+    stop) check_docker; initialize_env; compose stop ;;
+    start) check_docker; initialize_env; compose up --detach; wait_for_galaxy ;;
+    down) check_docker; initialize_env; compose down ;;
+    help|-h|--help) usage ;;
+    *) usage; fail "未知命令：$command_name" ;;
+esac
