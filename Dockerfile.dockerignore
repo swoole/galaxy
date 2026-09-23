@@ -3,8 +3,8 @@
 !galaxy-api/**
 !galaxy-fe/
 !galaxy-fe/**
-!galaxy-deploy/
-!galaxy-deploy/**
+!galaxy/
+!galaxy/**
 
 **/.git/
 **/node_modules/

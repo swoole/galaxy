@@ -39,7 +39,7 @@ services:
       - internal
 
   galaxy:
-    image: phpswoole/galaxy:${GALAXY_VERSION:-latest}
+    image: ${GALAXY_IMAGE:-registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy}:${GALAXY_VERSION:-latest}
     restart: unless-stopped
     depends_on:
       mysql:

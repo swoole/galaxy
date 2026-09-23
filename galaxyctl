@@ -173,10 +173,14 @@ update_stack() {
     initialize_env
     old_version="$(read_env GALAXY_VERSION)"
     [ -n "$old_version" ] || old_version=latest
+    image_repository="$(read_env GALAXY_IMAGE)"
+    [ -n "$image_repository" ] || image_repository=registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy
+    current_image="$image_repository:$old_version"
+    rollback_image="$image_repository:galaxyctl-rollback"
 
     backup_database
-    if docker image inspect "phpswoole/galaxy:$old_version" >/dev/null 2>&1; then
-        docker tag "phpswoole/galaxy:$old_version" phpswoole/galaxy:galaxyctl-rollback
+    if docker image inspect "$current_image" >/dev/null 2>&1; then
+        docker tag "$current_image" "$rollback_image"
     fi
 
     set_env GALAXY_VERSION "$target_version"
@@ -187,7 +191,7 @@ update_stack() {
     fi
 
     info '新版本健康检查失败，正在回滚应用镜像'
-    if docker image inspect phpswoole/galaxy:galaxyctl-rollback >/dev/null 2>&1; then
+    if docker image inspect "$rollback_image" >/dev/null 2>&1; then
         set_env GALAXY_VERSION galaxyctl-rollback
         compose up --detach --no-deps galaxy
         wait_for_galaxy || fail '自动回滚失败，请检查日志和数据库备份'

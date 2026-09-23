@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-RELEASE_BASE_URL="${GALAXY_RELEASE_BASE_URL:-https://raw.githubusercontent.com/swoole/galaxy/master}"
+RELEASE_BASE_URL="${GALAXY_RELEASE_BASE_URL:-https://git.code-galaxy.net/github/galaxy-docs/raw/branch/main/downloads}"
 INSTALL_DIR="${GALAXY_INSTALL_DIR:-$PWD/galaxy}"
 
 command -v curl >/dev/null 2>&1 || {

@@ -6,7 +6,7 @@
 
 | 镜像 | 用途 |
 | --- | --- |
-| `phpswoole/galaxy:<version>` | 前端、Nginx、API、ssh-relay 和 helm-service |
+| `registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy:<version>` | 前端、Nginx、API、ssh-relay 和 helm-service |
 | `phpswoole/galaxy-agent:<version>` | Docker Swarm 每节点 Agent |
 
 快速体验只需要第一个 Galaxy 镜像以及官方 MySQL、Redis 镜像。接入 Swarm 时再使用 Agent
@@ -17,23 +17,23 @@
 从工作区根目录作为 Docker build context：
 
 ```bash
-./galaxy-deploy/build.sh dev
+./galaxy/build.sh dev
 ```
 
 也可以单独构建一体化镜像：
 
 ```bash
 docker build \
-  -f galaxy-deploy/Dockerfile \
+  -f galaxy/Dockerfile \
   --build-arg VERSION=dev \
-  -t phpswoole/galaxy:dev \
+  -t registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy:dev \
   .
 ```
 
 ## 本地安装
 
 ```bash
-cd galaxy-deploy
+cd galaxy
 ./galaxyctl install \
   --version dev \
   --url http://<服务器IP>:8080 \
@@ -60,13 +60,18 @@ cd galaxy-deploy
 `update` 会先备份数据库并保留本地应用回滚镜像。当前数据库增量迁移链尚未建立，因此正式
 版本只应开放经过升级测试并明确声明兼容的更新路径。
 
-## 计划中的远程一键安装
+## 远程一键安装
 
-创建并发布 `swoole/galaxy` 发行仓库和 Docker Hub 镜像后，用户入口为：
+默认从阿里云容器镜像服务安装 `registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy:latest`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/swoole/galaxy/master/install.sh \
-  | bash -s -- --url https://galaxy.example.com
+curl -fsSL https://git.code-galaxy.net/github/galaxy-docs/raw/branch/main/downloads/install.sh \
+ | bash -s -- --url https://galaxy.example.com
 ```
 
-该目录的内容将作为发行仓库根目录，文件布局需与 `install.sh` 的 `RELEASE_BASE_URL` 保持一致。
+固定安装 `1.0.0`：
+
+```bash
+curl -fsSL https://git.code-galaxy.net/github/galaxy-docs/raw/branch/main/downloads/install.sh \
+  | bash -s -- --version 1.0.0 --url https://galaxy.example.com
+```

@@ -86,9 +86,9 @@ COPY --from=api-vendor /deps/vendor ./vendor
 COPY --from=ssh-relay-builder /out/galaxy-ssh-relay /usr/local/bin/galaxy-ssh-relay
 COPY --from=helm-service-builder /out/galaxy-helm-service /usr/local/bin/galaxy-helm-service
 COPY --from=frontend-builder /src/dist/ /usr/share/nginx/html/
-COPY galaxy-deploy/image/nginx.conf /etc/nginx/http.d/default.conf
-COPY galaxy-deploy/image/entrypoint.sh /usr/local/bin/galaxy-entrypoint
-COPY galaxy-deploy/image/initialize-database.php /usr/local/lib/galaxy/initialize-database.php
+COPY galaxy/image/nginx.conf /etc/nginx/http.d/default.conf
+COPY galaxy/image/entrypoint.sh /usr/local/bin/galaxy-entrypoint
+COPY galaxy/image/initialize-database.php /usr/local/lib/galaxy/initialize-database.php
 
 RUN composer dump-autoload --no-dev --optimize \
     && cp .env.example .env \

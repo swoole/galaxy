@@ -4,7 +4,7 @@ set -eu
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 WORKSPACE_DIR="$(dirname "$SCRIPT_DIR")"
 VERSION="${1:-dev}"
-IMAGE="${GALAXY_IMAGE:-phpswoole/galaxy:$VERSION}"
+IMAGE="${GALAXY_IMAGE:-registry.cn-shanghai.aliyuncs.com/swoole-public/galaxy:$VERSION}"
 AGENT_IMAGE="${GALAXY_AGENT_IMAGE:-phpswoole/galaxy-agent:$VERSION}"
 VCS_REF="$(git -C "$WORKSPACE_DIR/galaxy-api" rev-parse --short=12 HEAD 2>/dev/null || printf unknown)"
 BUILD_DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
